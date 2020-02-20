@@ -30,16 +30,16 @@ public class Main {
         vessel.getControl().setThrottle(1);
 
 
-        vessel.getControl().activateNextStage();
         System.out.println("Launch");
 
-        // Waits until solid fuel boosters have run out
+        // vessel.getControl().activateNextStage();
         liquidFuel(connection, vessel, krpc, 3);
 
+        // Waits until solid fuel boosters have run out
 
         System.out.println("Booster separation");
-        Thread.sleep(500);
-        vessel.getControl().activateNextStage();
+
+
 
         System.out.println("Gravity turn");
         gravityTurn(connection,vessel, krpc);
@@ -72,19 +72,27 @@ public class Main {
     }
 
     public static void liquidFuel(Connection connection, SpaceCenter.Vessel vessel, KRPC krpc, int stage) throws RPCException, StreamException {
-        Resources fuelAmount = vessel.resourcesInDecoupleStage(stage,false);
-        double liquidFuelAmount =  fuelAmount.amount("LiquidFuel");
+        Thread thread = new Thread(() -> {
+            try {
+                Resources fuelAmount = vessel.resourcesInDecoupleStage(stage,false);
+                double liquidFuelAmount =  fuelAmount.amount("LiquidFuel");
 
-        ProcedureCall liquidFuel = connection.getCall(vessel.resourcesInDecoupleStage(stage, false), "amount", "LiquidFuel");
-        Expression expr = Expression.lessThan(
-                connection,
-                Expression.call(connection, liquidFuel),
-                Expression.constantFloat(connection, 0.1f));
-        Event event = krpc.addEvent(expr);
+                ProcedureCall liquidFuel = connection.getCall(vessel.resourcesInDecoupleStage(stage, false), "amount", "LiquidFuel");
+                Expression expr = Expression.lessThan(
+                        connection,
+                        Expression.call(connection, liquidFuel),
+                        Expression.constantFloat(connection, 0.1f));
+                Event event = krpc.addEvent(expr);
 
-        synchronized (event.getCondition()) {
-            event.waitFor();
-        }
+                synchronized (event.getCondition()) {
+                    event.waitFor();
+                }
+                vessel.getControl().activateNextStage();
+            } catch (RPCException | StreamException e) {
+                e.printStackTrace();
+            }
+        });
+        thread.start();
     }
     public static void solidFuel(Connection connection, SpaceCenter.Vessel vessel, KRPC krpc) throws RPCException, StreamException {
         {
@@ -134,13 +142,13 @@ public class Main {
         double apoapsis = orbit.getApoapsisAltitude();
         double altitude = vessel.flight(null).getMeanAltitude();
         double speed  = vessel.flight(null).getSpeed();
-        Thread.sleep(1000);
-        vessel.getAutoPilot().targetPitchAndHeading(75, 90); // Kick
+        Thread.sleep(20000);
+        vessel.getAutoPilot().targetPitchAndHeading(85, 90); // Kick
         Thread.sleep(1200);
         while (apoapsis < 100000 ) {
             vessel.getAutoPilot().targetPitchAndHeading(pitch, 90);
             Thread.sleep(700);
-            pitch = pitch - (pitch/50f);
+            pitch = pitch - (pitch/70f);
             apoapsis = orbit.getApoapsisAltitude();
             System.out.println(apoapsis);
         }
